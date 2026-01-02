@@ -27,13 +27,12 @@ with st.sidebar:
     st.subheader("🕵️ Lista Personalizada")
     custom_input = st.text_area("IDs (ex: kaspa, monero)", "kaspa, render-token")
     
-    # --- CORREÇÃO DO ERRO ---
-    # Aqui usamos uma estrutura 'if/else' clássica para não dar erro
+    # --- CORREÇÃO DO ERRO DE SINTAXE AQUI ---
     if custom_input:
         custom_ids = [x.strip() for x in custom_input.split(',')]
     else:
-        custom_ids =
-    # ------------------------
+        custom_ids =  # Agora tem os parêntesis retos vazios
+    # ----------------------------------------
     
     analyze_btn = st.button("🚀 Iniciar Análise Completa", type="primary")
     st.info("Nota: A análise varre as Top 500 moedas e aplica filtros de preço e métricas de 12 meses.")
@@ -93,7 +92,7 @@ if analyze_btn:
         # Tabela Final
         st.subheader("🏆 Tabela Final: Classificação de Potencial")
         
-        # Definição das colunas
+        # CORREÇÃO: Lista de colunas preenchida explicitamente
         display_cols =
         
         # Garantir que colunas existem antes de mostrar
