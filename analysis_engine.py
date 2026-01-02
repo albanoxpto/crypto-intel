@@ -9,7 +9,7 @@ class CryptoDataEngine:
         self.cg_url = "https://api.coingecko.com/api/v3"
         self.dl_url = "https://api.llama.fi"
 
-    def fetch_market_data(self, max_price, custom_ids=):
+    def fetch_market_data(self, max_price, custom_ids=None):
         """Busca Top 500 moedas + Customizadas e filtra por preço."""
         all_coins =
         
@@ -56,7 +56,7 @@ class CryptoDataEngine:
         df = pd.DataFrame(all_coins)
         
         # Filtro de Preço do Usuário
-        if not df.empty:
+        if not df.empty and 'current_price' in df.columns:
             df = df[df['current_price'] <= max_price]
             
         return df
@@ -101,14 +101,24 @@ class CryptoDataEngine:
             return norm
 
         # 1. Indicadores de Mercado
-        df_merged['score_market_cap'] = normalize(np.log(df_merged['market_cap'] + 1))
-        df_merged['score_volume'] = normalize(np.log(df_merged['total_volume'] + 1))
+        if 'market_cap' in df_merged.columns:
+            df_merged['score_market_cap'] = normalize(np.log(df_merged['market_cap'] + 1))
+        else:
+            df_merged['score_market_cap'] = 10
+
+        if 'total_volume' in df_merged.columns:
+            df_merged['score_volume'] = normalize(np.log(df_merged['total_volume'] + 1))
+        else:
+            df_merged['score_volume'] = 10
         
         # 2. Tokenomics
-        df_merged['fully_diluted_valuation'] = df_merged['fully_diluted_valuation'].fillna(df_merged['market_cap'])
-        # Evitar divisão por zero
-        df_merged['fdv_ratio'] = df_merged['market_cap'] / df_merged['fully_diluted_valuation'].replace(0, 1)
-        df_merged['score_tokenomics'] = df_merged['fdv_ratio'] * 20 
+        if 'fully_diluted_valuation' in df_merged.columns:
+            df_merged['fully_diluted_valuation'] = df_merged['fully_diluted_valuation'].fillna(df_merged['market_cap'])
+            # Evitar divisão por zero
+            df_merged['fdv_ratio'] = df_merged['market_cap'] / df_merged['fully_diluted_valuation'].replace(0, 1)
+            df_merged['score_tokenomics'] = df_merged['fdv_ratio'] * 20 
+        else:
+            df_merged['score_tokenomics'] = 10
         
         # 3. Tração e Adoção
         df_merged['turnover'] = df_merged['total_volume'] / df_merged['market_cap'].replace(0, 1)
@@ -118,8 +128,11 @@ class CryptoDataEngine:
         df_merged['score_security'] = df_merged['audits'].apply(lambda x: 18 if isinstance(x, list) and len(x) > 0 else 5)
         
         # 5. Performance Histórica
-        df_merged['price_change_percentage_1y_in_currency'] = df_merged['price_change_percentage_1y_in_currency'].fillna(0)
-        df_merged['score_performance_1y'] = normalize(df_merged['price_change_percentage_1y_in_currency'])
+        if 'price_change_percentage_1y_in_currency' in df_merged.columns:
+            df_merged['price_change_percentage_1y_in_currency'] = df_merged['price_change_percentage_1y_in_currency'].fillna(0)
+            df_merged['score_performance_1y'] = normalize(df_merged['price_change_percentage_1y_in_currency'])
+        else:
+            df_merged['score_performance_1y'] = 10
 
         # 6. Volatilidade
         volatility_proxy = abs(df_merged['price_change_percentage_24h'].fillna(0)) + abs(df_merged['price_change_percentage_7d_in_currency'].fillna(0))
@@ -137,7 +150,7 @@ class CryptoDataEngine:
             'score_stability', 'score_governance', 'score_tech_dev'
         ]
         
-        # Média Final (Corrigido)
+        # Média Final (Adicionando a coluna FINAL_SCORE ao DataFrame original)
         df_merged = df_merged[indicators].mean(axis=1)
         
         return df_merged
