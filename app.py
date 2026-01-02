@@ -27,8 +27,13 @@ with st.sidebar:
     st.subheader("🕵️ Lista Personalizada")
     custom_input = st.text_area("IDs (ex: kaspa, monero)", "kaspa, render-token")
     
-    # CORREÇÃO DA LINHA QUE DEU ERRO: Adicionado o "" no final
-    custom_ids = [x.strip() for x in custom_input.split(',')] if custom_input else
+    # --- CORREÇÃO DO ERRO ---
+    # Aqui usamos uma estrutura 'if/else' clássica para não dar erro
+    if custom_input:
+        custom_ids = [x.strip() for x in custom_input.split(',')]
+    else:
+        custom_ids =
+    # ------------------------
     
     analyze_btn = st.button("🚀 Iniciar Análise Completa", type="primary")
     st.info("Nota: A análise varre as Top 500 moedas e aplica filtros de preço e métricas de 12 meses.")
@@ -88,7 +93,7 @@ if analyze_btn:
         # Tabela Final
         st.subheader("🏆 Tabela Final: Classificação de Potencial")
         
-        # Definição das colunas (CORREÇÃO: Lista preenchida)
+        # Definição das colunas
         display_cols =
         
         # Garantir que colunas existem antes de mostrar
@@ -115,7 +120,8 @@ if analyze_btn:
         c1, c2 = st.columns([1, 2])
         
         with c1:
-            st.image(coin_data['image'], width=100)
+            if 'image' in coin_data and coin_data['image']:
+                st.image(coin_data['image'], width=100)
             st.markdown(f"### {coin_data['name']} ({coin_data['symbol'].upper()})")
             st.write(f"**Preço:** ${coin_data['current_price']}")
             ath_change = coin_data.get('ath_change_percentage', 0)
@@ -145,8 +151,8 @@ if analyze_btn:
                 "Data da Coleta": str(datetime.datetime.now()),
                 "Fonte Primária": "CoinGecko API v3",
                 "Fonte Secundária": "DefiLlama API",
-                "ID do Ativo": coin_data['id'],
-                "Última Atualização": coin_data['last_updated']
+                "ID do Ativo": coin_data.get('id', 'N/A'),
+                "Última Atualização": coin_data.get('last_updated', 'N/A')
             })
 
 # --- ABA HISTÓRICO ---
