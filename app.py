@@ -12,7 +12,7 @@ st.set_page_config(page_title="CryptoIntel Pro", layout="wide", page_icon="🛡�
 # Injeção de CSS
 st.markdown("""
 <style>
-  .metric-card {background-color: #f0f2f6; border-radius: 10px; padding: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);}
+ .metric-card {background-color: #f0f2f6; border-radius: 10px; padding: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);}
 </style>
 """, unsafe_allow_html=True)
 
@@ -26,6 +26,7 @@ with st.sidebar:
     
     st.subheader("🕵️ Lista Personalizada")
     custom_input = st.text_area("IDs (ex: kaspa, monero)", "kaspa, render-token")
+    # Correção do erro de sintaxe aqui (adicionado 'else')
     custom_ids = [x.strip() for x in custom_input.split(',')] if custom_input else
     
     analyze_btn = st.button("🚀 Iniciar Análise Completa", type="primary")
@@ -70,7 +71,7 @@ if analyze_btn:
     # --- DASHBOARD DE RESULTADOS ---
     col1, col2, col3 = st.columns(3)
     
-    # Encontrar melhor ativo (Correção do erro anterior)
+    # Encontrar melhor ativo
     if not df_final.empty and 'FINAL_SCORE' in df_final.columns:
         best_idx = df_final.idxmax()
         best_asset = df_final.loc[best_idx]
@@ -85,6 +86,7 @@ if analyze_btn:
     # Tabela Final
     st.subheader("🏆 Tabela Final: Classificação de Potencial")
     
+    # Definição das colunas para exibir
     display_cols =
     
     # Garantir que colunas existem
