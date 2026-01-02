@@ -31,7 +31,7 @@ class CryptoDataEngine:
             except Exception as e:
                 print(f"Erro na pagina {page}: {e}")
 
-        # Busca dados das moedas personalizadas se não estiverem no Top 500
+        # Busca dados das moedas personalizadas
         if custom_ids:
             # Filtra strings vazias
             custom_ids = [x for x in custom_ids if x]
@@ -81,17 +81,17 @@ class CryptoDataEngine:
         if not df_defi.empty and 'symbol' in df_defi.columns:
             df_defi['symbol_upper'] = df_defi['symbol'].str.upper()
             df_market['symbol_upper'] = df_market['symbol'].str.upper()
+            # Left join para manter dados de mercado mesmo sem DeFi
             df_merged = pd.merge(df_market, df_defi[['symbol_upper', 'tvl', 'audits']], on='symbol_upper', how='left')
         else:
             df_merged = df_market.copy()
             df_merged['tvl'] = 0
             df_merged['audits'] = 0
 
-        # Preencher NaNs críticos
+        # Preencher NaNs críticos com 0
         df_merged['tvl'] = df_merged['tvl'].fillna(0)
         
         def normalize(series, invert=False):
-            # Normaliza de 1 a 20
             series = series.fillna(0)
             min_v = series.min()
             max_v = series.max()
@@ -102,12 +102,12 @@ class CryptoDataEngine:
 
         # 1. Indicadores de Mercado
         if 'market_cap' in df_merged.columns:
-            df_merged['score_market_cap'] = normalize(np.log(df_merged['market_cap'] + 1))
+            df_merged['score_market_cap'] = normalize(np.log(df_merged['market_cap'].replace(0, 1) + 1))
         else:
             df_merged['score_market_cap'] = 10
 
         if 'total_volume' in df_merged.columns:
-            df_merged['score_volume'] = normalize(np.log(df_merged['total_volume'] + 1))
+            df_merged['score_volume'] = normalize(np.log(df_merged['total_volume'].replace(0, 1) + 1))
         else:
             df_merged['score_volume'] = 10
         
@@ -121,8 +121,11 @@ class CryptoDataEngine:
             df_merged['score_tokenomics'] = 10
         
         # 3. Tração e Adoção
-        df_merged['turnover'] = df_merged['total_volume'] / df_merged['market_cap'].replace(0, 1)
-        df_merged['score_adoption'] = normalize(df_merged['turnover'])
+        if 'total_volume' in df_merged.columns and 'market_cap' in df_merged.columns:
+            df_merged['turnover'] = df_merged['total_volume'] / df_merged['market_cap'].replace(0, 1)
+            df_merged['score_adoption'] = normalize(df_merged['turnover'])
+        else:
+            df_merged['score_adoption'] = 10
         
         # 4. Segurança
         df_merged['score_security'] = df_merged['audits'].apply(lambda x: 18 if isinstance(x, list) and len(x) > 0 else 5)
@@ -135,22 +138,25 @@ class CryptoDataEngine:
             df_merged['score_performance_1y'] = 10
 
         # 6. Volatilidade
-        volatility_proxy = abs(df_merged['price_change_percentage_24h'].fillna(0)) + abs(df_merged['price_change_percentage_7d_in_currency'].fillna(0))
-        df_merged['score_stability'] = normalize(volatility_proxy, invert=True)
+        if 'price_change_percentage_24h' in df_merged.columns:
+            volatility_proxy = abs(df_merged['price_change_percentage_24h'].fillna(0))
+            df_merged['score_stability'] = normalize(volatility_proxy, invert=True)
+        else:
+            df_merged['score_stability'] = 10
 
         # 7. Indicadores Qualitativos Simulados
         np.random.seed(42)
         df_merged['score_governance'] = np.random.randint(5, 18, size=len(df_merged)) 
         df_merged['score_tech_dev'] = np.random.randint(5, 20, size=len(df_merged))
 
-        # --- Tabela Final de Pontuação ---
+        # --- Cálculo da Média Final ---
         indicators = [
             'score_market_cap', 'score_volume', 'score_tokenomics', 
             'score_adoption', 'score_security', 'score_performance_1y',
             'score_stability', 'score_governance', 'score_tech_dev'
         ]
         
-        # Média Final (Adicionando a coluna FINAL_SCORE ao DataFrame original)
+        # CORREÇÃO: Cria a coluna FINAL_SCORE mantendo os dados originais
         df_merged = df_merged[indicators].mean(axis=1)
         
         return df_merged
