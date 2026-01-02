@@ -9,13 +9,6 @@ import datetime
 # Configuração da Página
 st.set_page_config(page_title="CryptoIntel Pro", layout="wide", page_icon="🛡️")
 
-# Injeção de CSS
-st.markdown("""
-<style>
-.metric-card {background-color: #f0f2f6; border-radius: 10px; padding: 15px; box-shadow: 2px 2px 5px rgba(0,0,0,0.1);}
-</style>
-""", unsafe_allow_html=True)
-
 st.title("🛡️ CryptoIntel: Sistema de Análise Fundamentalista & Quantitativa")
 st.markdown("---")
 
@@ -27,12 +20,11 @@ with st.sidebar:
     st.subheader("🕵️ Lista Personalizada")
     custom_input = st.text_area("IDs (ex: kaspa, monero)", "kaspa, render-token")
     
-    # --- CORREÇÃO DO ERRO DE SINTAXE AQUI ---
+    # --- CORREÇÃO: Lógica segura para criar a lista ---
     if custom_input:
         custom_ids = [x.strip() for x in custom_input.split(',')]
     else:
-        custom_ids =  # Agora tem os parêntesis retos vazios
-    # ----------------------------------------
+        custom_ids = # Agora com os parêntesis corretos
     
     analyze_btn = st.button("🚀 Iniciar Análise Completa", type="primary")
     st.info("Nota: A análise varre as Top 500 moedas e aplica filtros de preço e métricas de 12 meses.")
@@ -77,7 +69,7 @@ if analyze_btn:
     if not df_final.empty and 'FINAL_SCORE' in df_final.columns:
         col1, col2, col3 = st.columns(3)
         
-        # Encontrar melhor ativo
+        # CORREÇÃO: Encontrar o índice da melhor nota corretamente
         best_idx = df_final.idxmax()
         best_asset = df_final.loc[best_idx]
         
@@ -92,7 +84,6 @@ if analyze_btn:
         # Tabela Final
         st.subheader("🏆 Tabela Final: Classificação de Potencial")
         
-        # CORREÇÃO: Lista de colunas preenchida explicitamente
         display_cols =
         
         # Garantir que colunas existem antes de mostrar
