@@ -156,7 +156,7 @@ class CryptoDataEngine:
             'score_stability', 'score_governance', 'score_tech_dev'
         ]
         
-        # CORREÇÃO: Cria a coluna FINAL_SCORE mantendo os dados originais
+        # CORREÇÃO CRÍTICA: Agora salvamos na coluna em vez de sobrescrever o DataFrame
         df_merged = df_merged[indicators].mean(axis=1)
         
         return df_merged
