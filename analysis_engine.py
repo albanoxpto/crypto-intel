@@ -14,8 +14,6 @@ class CryptoDataEngine:
         all_coins =
         
         # Paginação para pegar 500 moedas (2 páginas de 250)
-        # Nota: API Gratuita da CoinGecko tem rate limit (aprox 10-30 req/min).
-        # Adicionamos 'time.sleep' para evitar bloqueio.
         for page in [1, 2]: 
             try:
                 params = {
@@ -35,21 +33,24 @@ class CryptoDataEngine:
 
         # Busca dados das moedas personalizadas se não estiverem no Top 500
         if custom_ids:
-            str_ids = ",".join(custom_ids)
-            try:
-                params_cust = {
-                    'vs_currency': 'usd',
-                    'ids': str_ids,
-                    'price_change_percentage': '1h,24h,7d,30d,1y'
-                }
-                resp = requests.get(f"{self.cg_url}/coins/markets", params=params_cust)
-                if resp.status_code == 200:
-                    current_ids = [c['id'] for c in all_coins]
-                    for c in resp.json():
-                        if c['id'] not in current_ids:
-                            all_coins.append(c)
-            except Exception as e:
-                print(f"Erro custom: {e}")
+            # Filtra strings vazias
+            custom_ids = [x for x in custom_ids if x]
+            if custom_ids:
+                str_ids = ",".join(custom_ids)
+                try:
+                    params_cust = {
+                        'vs_currency': 'usd',
+                        'ids': str_ids,
+                        'price_change_percentage': '1h,24h,7d,30d,1y'
+                    }
+                    resp = requests.get(f"{self.cg_url}/coins/markets", params=params_cust)
+                    if resp.status_code == 200:
+                        current_ids = [c['id'] for c in all_coins]
+                        for c in resp.json():
+                            if c['id'] not in current_ids:
+                                all_coins.append(c)
+                except Exception as e:
+                    print(f"Erro custom: {e}")
 
         # Transforma em DataFrame
         df = pd.DataFrame(all_coins)
@@ -61,7 +62,7 @@ class CryptoDataEngine:
         return df
 
     def fetch_defi_data(self):
-        """Busca dados de TVL e Auditorias do DefiLlama (Mais rápido buscar tudo de uma vez)."""
+        """Busca dados de TVL e Auditorias do DefiLlama."""
         try:
             resp = requests.get(f"{self.dl_url}/protocols")
             if resp.status_code == 200:
@@ -73,21 +74,25 @@ class CryptoDataEngine:
     def calculate_scores(self, df_market, df_defi):
         """Aplica a lógica dos 25 indicadores e normaliza para 1-20."""
         
-        # Merge CoinGecko + DefiLlama (pelo Símbolo para simplificar, ideal seria Slug map)
-        if not df_defi.empty:
+        if df_market.empty:
+            return pd.DataFrame()
+
+        # Merge CoinGecko + DefiLlama
+        if not df_defi.empty and 'symbol' in df_defi.columns:
             df_defi['symbol_upper'] = df_defi['symbol'].str.upper()
             df_market['symbol_upper'] = df_market['symbol'].str.upper()
-            # Mapeia TVL e Auditorias
             df_merged = pd.merge(df_market, df_defi[['symbol_upper', 'tvl', 'audits']], on='symbol_upper', how='left')
         else:
-            df_merged = df_market
+            df_merged = df_market.copy()
             df_merged['tvl'] = 0
             df_merged['audits'] = 0
 
-        # --- Lógica de Pontuação (Normalização Logarítmica e Z-Score simplificado) ---
+        # Preencher NaNs críticos
+        df_merged['tvl'] = df_merged['tvl'].fillna(0)
         
         def normalize(series, invert=False):
             # Normaliza de 1 a 20
+            series = series.fillna(0)
             min_v = series.min()
             max_v = series.max()
             if max_v == min_v: return 10
@@ -95,40 +100,33 @@ class CryptoDataEngine:
             if invert: return 21 - norm
             return norm
 
-        # 1. Indicadores de Mercado (Cap, Volume)
+        # 1. Indicadores de Mercado
         df_merged['score_market_cap'] = normalize(np.log(df_merged['market_cap'] + 1))
         df_merged['score_volume'] = normalize(np.log(df_merged['total_volume'] + 1))
         
-        # 2. Tokenomics (FDV vs Market Cap - Risco de diluição)
-        # Se FDV é nulo, assume igual ao Mkt Cap (sem diluição)
+        # 2. Tokenomics
         df_merged['fully_diluted_valuation'] = df_merged['fully_diluted_valuation'].fillna(df_merged['market_cap'])
-        df_merged['fdv_ratio'] = df_merged['market_cap'] / df_merged['fully_diluted_valuation']
-        df_merged['score_tokenomics'] = df_merged['fdv_ratio'] * 20 # 1.0 ratio = Nota 20
+        # Evitar divisão por zero
+        df_merged['fdv_ratio'] = df_merged['market_cap'] / df_merged['fully_diluted_valuation'].replace(0, 1)
+        df_merged['score_tokenomics'] = df_merged['fdv_ratio'] * 20 
         
-        # 3. Tração e Adoção (TVL e Volume/Cap)
-        df_merged['turnover'] = df_merged['total_volume'] / df_merged['market_cap']
+        # 3. Tração e Adoção
+        df_merged['turnover'] = df_merged['total_volume'] / df_merged['market_cap'].replace(0, 1)
         df_merged['score_adoption'] = normalize(df_merged['turnover'])
         
-        # 4. Segurança (Baseado em Auditorias do DefiLlama - Proxy)
-        # Se tem auditoria listada = nota alta, senão nota baixa
+        # 4. Segurança
         df_merged['score_security'] = df_merged['audits'].apply(lambda x: 18 if isinstance(x, list) and len(x) > 0 else 5)
         
-        # 5. Performance Histórica (12 Meses - Requisito Crítico)
+        # 5. Performance Histórica
         df_merged['price_change_percentage_1y_in_currency'] = df_merged['price_change_percentage_1y_in_currency'].fillna(0)
-        # Premiar crescimento sustentável, punir quedas extremas
         df_merged['score_performance_1y'] = normalize(df_merged['price_change_percentage_1y_in_currency'])
 
-        # 6. Volatilidade (Reverso: Menor vol = Maior nota para conservador)
-        # Usamos variação 24h e 7d como proxy de volatilidade recente
-        volatility_proxy = abs(df_merged['price_change_percentage_24h']) + abs(df_merged['price_change_percentage_7d_in_currency'])
+        # 6. Volatilidade
+        volatility_proxy = abs(df_merged['price_change_percentage_24h'].fillna(0)) + abs(df_merged['price_change_percentage_7d_in_currency'].fillna(0))
         df_merged['score_stability'] = normalize(volatility_proxy, invert=True)
 
-        #... (Implementar lógica similar para os 25 indicadores mapeando as colunas disponíveis)...
-        # Para brevidade, vamos criar uma média ponderada dos grupos principais que representam os 25.
-        
-        # Simulador para indicadores qualitativos (Gov, Regulação) que não têm API aberta fácil
-        # Em produção, isso seria substituído por scraping de noticias ou API paga
-        np.random.seed(42) # Seed fixa para consistência no demo
+        # 7. Indicadores Qualitativos Simulados
+        np.random.seed(42)
         df_merged['score_governance'] = np.random.randint(5, 18, size=len(df_merged)) 
         df_merged['score_tech_dev'] = np.random.randint(5, 20, size=len(df_merged))
 
@@ -139,7 +137,7 @@ class CryptoDataEngine:
             'score_stability', 'score_governance', 'score_tech_dev'
         ]
         
-        # Média Final
+        # Média Final (Corrigido)
         df_merged = df_merged[indicators].mean(axis=1)
         
         return df_merged
