@@ -24,7 +24,7 @@ with st.sidebar:
     if custom_input:
         custom_ids = [x.strip() for x in custom_input.split(',')]
     else:
-        custom_ids =  # Agora com os parentesis retos
+        custom_ids =  # Agora tem os parêntesis retos (lista vazia)
     # ------------------------
     
     analyze_btn = st.button("🚀 Iniciar Análise", type="primary")
@@ -69,6 +69,7 @@ if analyze_btn:
     if not df_final.empty and 'FINAL_SCORE' in df_final.columns:
         col1, col2, col3 = st.columns(3)
         
+        # Encontrar melhor ativo de forma segura
         best_idx = df_final.idxmax()
         best_asset = df_final.loc[best_idx]
         
@@ -82,10 +83,9 @@ if analyze_btn:
 
         st.subheader("🏆 Tabela de Classificação")
         
-        # Colunas seguras para exibir
-        cols_to_show =
-        # Filtra apenas colunas que realmente existem no dataframe
-        valid_cols = [c for c in cols_to_show if c in df_final.columns]
+        # Colunas para exibir (apenas as que existem)
+        desired_cols =
+        valid_cols = [c for c in desired_cols if c in df_final.columns]
         
         st.dataframe(
             df_final[valid_cols].sort_values(by='FINAL_SCORE', ascending=False).style.background_gradient(subset=, cmap='RdYlGn'),
